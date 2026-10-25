@@ -467,7 +467,7 @@ local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 Notification:Notify(
     {Title = "欢迎使用脚本", Description = "请加入QQ群：310057979"},
     {OutlineColor = Color3.fromRGB(255, 255, 255), Time = 9, Type = "image"},
-    {Image = "http://www.roblox.com/asset/?id=66923", ImageColor = Color3.fromRGB(150, 150, 150)}
+    {Image = "http://www.roblox.com/asset/?id=23", ImageColor = Color3.fromRGB(150, 150, 150)}
 )
 
 local NotificationHolder = loadstring(game:HttpGet("https://raw.githubusercontent.com/xiaodi7598/-1.0/refs/heads/main/%E9%80%9A%E7%9F%A51.lua"))()
@@ -476,7 +476,7 @@ local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 Notification:Notify(
     {Title = "已开启反挂机", Description = "作者帮助你开启反挂机了"},
     {OutlineColor = Color3.fromRGB(255, 255, 255), Time = 9, Type = "image"},
-    {Image = "http://www.roblox.com/asset/?id=6023426923", ImageColor = Color3.fromRGB(150, 150, 150)}
+    {Image = "http://www.roblox.com/asset/?id=", ImageColor = Color3.fromRGB(150, 150, 150)}
 )
 
 -- 反挂机脚本保持不变
