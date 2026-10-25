@@ -508,7 +508,7 @@ local Window = WindUI:CreateWindow({
     SideBarWidth = 220,
     ScrollBarEnabled = true,
     HideSearchBar = false,
-    Background = "",
+    Background = "rbxassetid://96771724379864",
 })
 
 Window:Tag({
