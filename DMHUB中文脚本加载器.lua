@@ -194,7 +194,7 @@ local Button = Tab:Button({
     Desc = "",
     Locked = false,
     Callback = function()
-        loadstring(game:HttpGet（""))()
+        loadstring(game:HttpGet（"https://raw.githubusercontent.com/yizhixieDM/DM-HUB/refs/heads/main/冬某飞行.lua"))()
     end
 })
 
