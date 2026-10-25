@@ -125,7 +125,7 @@ end)()
 
 --如果你看到这条信息，大概我的脚本源码被泄露也是难免了
 
-local soundId = "rbxassetid://88457346646245" -- 请确认此音效内容完全合规
+local soundId = "rbxassetid://88457245" -- 请确认此音效内容完全合规
 local Workspace = game:GetService("Workspace")
 
 -- 创建音效对象
@@ -1464,7 +1464,7 @@ local dropdownElement = Tab3:Dropdown({
     Callback = function(value)
         PlayerConfig.playernamedied = value
         dropdownValue = value
-        Notify("黑白脚本", "已选择玩家: " .. value, 3)
+        Notify("DM脚本", "已选择玩家: " .. value, 3)
     end
 })
 
@@ -1475,7 +1475,7 @@ Tab3:Button({
     Callback = function()
         shuaxinlb(true)
         dropdownElement:SetValues(PlayerConfig.dropdown)
-        Notify("黑白脚本", "玩家列表已刷新", 3)
+        Notify("DM脚本", "玩家列表已刷新", 3)
     end
 })
 
@@ -1485,7 +1485,7 @@ Tab3:Button({
     Icon = "arrow-right-to-bracket",
     Callback = function()
         if PlayerConfig.playernamedied == "" then
-            Notify("黑白脚本", "请先选择玩家", 5)
+            Notify("DM脚本", "请先选择玩家", 5)
             return
         end
         
@@ -1494,9 +1494,9 @@ Tab3:Button({
         
         if localRootPart and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
             localRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame + Vector3.new(0, 3, 0)
-            Notify("黑白脚本", "已经传送到玩家身边", 5)
+            Notify("DM脚本", "已经传送到玩家身边", 5)
         else
-            Notify("黑白脚本", "无法传送 原因: 玩家已消失", 5)
+            Notify("DM脚本", "无法传送 原因: 玩家已消失", 5)
         end
     end
 })
@@ -1511,7 +1511,7 @@ Tab3:Toggle({
         PlayerConfig.LoopTeleport = enabled
         
         if enabled then
-            Notify("黑白脚本", "已开启循环传送", 5)
+            Notify("DM脚本", "已开启循环传送", 5)
             
             spawn(function()
                 while PlayerConfig.LoopTeleport do
@@ -1525,7 +1525,7 @@ Tab3:Toggle({
                 end
             end)
         else
-            Notify("黑白脚本", "已关闭循环传送", 5)
+            Notify("DM脚本", "已关闭循环传送", 5)
         end
     end
 })
@@ -1536,7 +1536,7 @@ Tab3:Button({
     Icon = "arrow-left-to-bracket",
     Callback = function()
         if PlayerConfig.playernamedied == "" then
-            Notify("黑白脚本", "请先选择玩家", 5)
+            Notify("DM脚本", "请先选择玩家", 5)
             return
         end
         
@@ -1545,9 +1545,9 @@ Tab3:Button({
         
         if localRootPart and targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
             targetPlayer.Character.HumanoidRootPart.CFrame = localRootPart.CFrame + Vector3.new(0, 3, 0)
-            Notify("黑白脚本", "已将玩家传送过来", 5)
+            Notify("DM脚本", "已将玩家传送过来", 5)
         else
-            Notify("黑白脚本", "无法传送 原因: 玩家已消失", 5)
+            Notify("DM脚本", "无法传送 原因: 玩家已消失", 5)
         end
     end
 })
@@ -1562,7 +1562,7 @@ Tab3:Toggle({
         PlayerConfig.LoopTeleportToMe = enabled
         
         if enabled then
-            Notify("黑白脚本", "已开启循环传送玩家过来", 5)
+            Notify("DM脚本", "已开启循环传送玩家过来", 5)
             
             spawn(function()
                 while PlayerConfig.LoopTeleportToMe do
@@ -1576,7 +1576,7 @@ Tab3:Toggle({
                 end
             end)
         else
-            Notify("黑白脚本", "已关闭循环传送玩家过来", 5)
+            Notify("DM脚本", "已关闭循环传送玩家过来", 5)
         end
     end
 })
@@ -1591,7 +1591,7 @@ Tab3:Toggle({
         PlayerConfig.LoopTeleportAll = enabled
         
         if enabled then
-            Notify("黑白脚本", "已开启吸全部玩家", 5)
+            Notify("DM脚本", "已开启吸全部玩家", 5)
             spawn(function()
                 while PlayerConfig.LoopTeleportAll do
                     for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
@@ -1612,7 +1612,7 @@ Tab3:Toggle({
                 end
             end)
         else
-            Notify("黑白脚本", "已关闭吸全部玩家", 5)
+            Notify("DM脚本", "已关闭吸全部玩家", 5)
         end
     end
 })
@@ -1628,21 +1628,21 @@ Tab3:Toggle({
         
         if enabled then
             if PlayerConfig.playernamedied == "" then
-                Notify("黑白脚本", "请先选择玩家", 5)
+                Notify("DM脚本", "请先选择玩家", 5)
                 return
             end
             
             local targetPlayer = game:GetService("Players"):FindFirstChild(PlayerConfig.playernamedied)
             if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") then
                 game:GetService("Workspace").CurrentCamera.CameraSubject = targetPlayer.Character.Humanoid
-                Notify("黑白脚本", "已开启查看玩家", 5)
+                Notify("DM脚本", "已开启查看玩家", 5)
             else
-                Notify("黑白脚本", "无法查看玩家", 5)
+                Notify("DM脚本", "无法查看玩家", 5)
             end
         else
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
                 game:GetService("Workspace").CurrentCamera.CameraSubject = LocalPlayer.Character.Humanoid
-                Notify("黑白脚本", "已关闭查看玩家", 5)
+                Notify("DM脚本", "已关闭查看玩家", 5)
             end
         end
     end
@@ -1691,7 +1691,7 @@ local function ThrowPlayer(targetPlayer)
     local targetCharacter = targetPlayer.Character
     
     if not localCharacter or not localHumanoid or not localRootPart or not targetCharacter then
-        SendNotification("黑白脚本", "无法甩飞: 角色不存在", 5)
+        SendNotification("DM脚本", "无法甩飞: 角色不存在", 5)
         return
     end
     
@@ -1706,7 +1706,7 @@ local function ThrowPlayer(targetPlayer)
     end
     
     if targetHumanoid and targetHumanoid.Sit then
-        SendNotification("黑白脚本", "玩家正在坐下", 5)
+        SendNotification("DM脚本", "玩家正在坐下", 5)
         return
     end
     
@@ -1824,7 +1824,7 @@ local function ThrowPlayer(targetPlayer)
     elseif targetAccessory and accessoryHandle then
         PerformThrowAnimation(accessoryHandle)
     else
-        SendNotification("黑白脚本", "无法甩飞目标", 5)
+        SendNotification("DM脚本", "无法甩飞目标", 5)
         return
     end
     
@@ -1863,7 +1863,7 @@ Tab3:Button({
     Icon = "target",
     Callback = function()
         if PlayerConfig.playernamedied == "" then
-            Notify("黑白脚本", "请先选择玩家", 5)
+            Notify("DM脚本", "请先选择玩家", 5)
             return
         end
         
@@ -1876,16 +1876,16 @@ Tab3:Button({
                     ThrowPlayer(player)
                 end
             end
-            SendNotification("黑白脚本", "正在甩飞所有玩家", 5)
+            SendNotification("DM脚本", "正在甩飞所有玩家", 5)
         elseif foundPlayer then
             if foundPlayer.UserId == 1414978355 then
-                SendNotification("黑白脚本", "检测到特殊玩家，已停止", 5)
+                SendNotification("DM脚本", "检测到特殊玩家，已停止", 5)
                 return
             end
             ThrowPlayer(foundPlayer)
-            SendNotification("黑白脚本", "正在甩飞玩家", 5)
+            SendNotification("DM脚本", "正在甩飞玩家", 5)
         else
-            SendNotification("黑白脚本", "未找到玩家", 5)
+            SendNotification("DM脚本", "未找到玩家", 5)
         end
     end
 })
@@ -1900,7 +1900,7 @@ Tab3:Toggle({
         PlayerConfig.AutoFling = enabled
         
         if enabled then
-            Notify("黑白脚本", "已开启循环甩飞", 5)
+            Notify("DM脚本", "已开启循环甩飞", 5)
             
             spawn(function()
                 while PlayerConfig.AutoFling do
@@ -1924,7 +1924,7 @@ Tab3:Toggle({
                 end
             end)
         else
-            Notify("黑白脚本", "已关闭循环甩飞", 5)
+            Notify("DM脚本", "已关闭循环甩飞", 5)
         end
     end
 })
@@ -1941,12 +1941,12 @@ Tab3:Toggle({
         
         if enabled then
             if PlayerConfig.playernamedied == "" then
-                Notify("黑白脚本", "请先选择玩家", 5)
+                Notify("Dm脚本", "请先选择玩家", 5)
                 PlayerConfig.Aimbot = false
                 return
             end
             
-            Notify("黑白脚本", "已开启自瞄", 5)
+            Notify("DM脚本", "已开启自瞄", 5)
             
             spawn(function()
                 while PlayerConfig.Aimbot do
@@ -1962,7 +1962,7 @@ Tab3:Toggle({
                 end
             end)
         else
-            Notify("黑白脚本", "已关闭自瞄", 5)
+            Notify("DM脚本", "已关闭自瞄", 5)
         end
     end
 })
@@ -2067,11 +2067,11 @@ Window:Divider()
 local Tab97 = Tab("更多服务器")
 
 local Paragraph = Tab0:Paragraph({
-    Title = "黑白脚本DC群",
-    Desc = "点击复制按钮获取Discord邀请链接",
+    Title = "DMHUB群",
+    Desc = "点击复制按钮获取",
     
     -- 视觉设置
-    Image = "rbxassetid://7040347038", -- 背景图片
+    Image = "rbxassetid://70408", -- 背景图片
     ImageSize = 30, -- 图片显示尺寸
     Thumbnail = "", -- 缩略图（留空）
     ThumbnailSize = 80, -- 缩略图尺寸
@@ -2084,7 +2084,7 @@ local Paragraph = Tab0:Paragraph({
             Icon = "crown", -- 按钮图标
             Title = "复制链接", -- 按钮文本
             Callback = function()
-                local cardKey = "https://discord.gg/MsdBcJBS"
+                local cardKey = "310057979"
                 
                 -- 安全执行复制操作
                 local success, errorMsg = pcall(function()
@@ -2099,7 +2099,7 @@ local Paragraph = Tab0:Paragraph({
                     -- 显示成功通知
                     game:GetService("StarterGui"):SetCore("SendNotification", {
                         Title = "✅ 复制成功",
-                        Text = "Discord邀请链接已复制到剪贴板",
+                        Text = "链接已复制到剪贴板",
                         Icon = "rbxassetid://7040347038",
                         Duration = 5,
                         Button1 = "确定",
@@ -2109,7 +2109,7 @@ local Paragraph = Tab0:Paragraph({
                     })
                     
                     -- 控制台输出（便于调试）
-                    print("[系统] 已复制Discord链接: " .. cardKey)
+                    print("[系统] 已复制链接: " .. cardKey)
                 end)
                 
                 -- 错误处理
@@ -2134,7 +2134,7 @@ local Paragraph = Tab0:Paragraph({
 
 -- 可选：添加段落状态跟踪
 if Paragraph then
-    print("DC群邀请段落已加载")
+    print("邀请段落已加载")
     
     -- 可选：添加一些额外功能
     -- 例如：添加鼠标悬停提示
@@ -2144,7 +2144,7 @@ if Paragraph then
 end
 
 -- 简介 (Tab0)
-Button(Tab0, "最没母的群570910164千万别进否则会浮木会死掉", function()
+Button(Tab0, "最没母的群984571833千万别进否则会浮木会死掉", function()
     pcall(function()
     end)
 end)
