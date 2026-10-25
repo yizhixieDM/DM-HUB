@@ -2070,13 +2070,6 @@ local Paragraph = Tab0:Paragraph({
     Title = "DMHUB群",
     Desc = "点击复制按钮获取",
     
-    -- 视觉设置
-    Image = "rbxassetid://70408", -- 背景图片
-    ImageSize = 30, -- 图片显示尺寸
-    Thumbnail = "", -- 缩略图（留空）
-    ThumbnailSize = 80, -- 缩略图尺寸
-    
-    Locked = false, -- 是否锁定
     
     -- 按钮配置
     Buttons = {
