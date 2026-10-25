@@ -187,7 +187,7 @@ local Notification = loadstring(game:HttpGet("https://raw.githubusercontent.com/
 Notification:Notify(
     {Title = "正在加载脚本", Description = "请耐心等待"},
     {OutlineColor = Color3.fromRGB(255, 255, 255), Time = 20, Type = "image"},
-    {Image = "http://www.roblox.com/asset/?id=60292", ImageColor = Color3.fromRGB(150, 150, 150)}
+    {Image = "http://www.roblox.com/asset/?id292", ImageColor = Color3.fromRGB(150, 150, 150)}
 )
 
 local Players = game:GetService("Players")
