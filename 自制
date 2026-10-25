@@ -1,0 +1,1211 @@
+--[[
+  Roblox - UI 3.0 最终优化版
+  卡密：hi
+  功能：
+    - 黑红高级风 UI
+    - 居中显示，可拖动
+    - 右上角最小化
+    - 最小化栏：左图标 / 右脚本名
+    - 卡密验证
+    - 主界面 / 设置 / 翻译 / 服务器 / 日志 / 功能说明
+    - 舞蹈功能
+    - 本地自动点击器（仅 UI 脉冲模拟，不做外部点击）
+    - 目标辅助（仅显示目标和范围，不自动击杀、不自动开火）
+    - 修复多项前版 bug
+    - 减少脚本冲突
+
+  注意：
+    - 图标请替换 ICON_ASSET_ID
+    - 目标辅助仅视觉提示，不造成作弊行为
+    - 该脚本是合法本地 UI / 测试工具脚本
+
+  放置位置：
+    StarterPlayer > StarterPlayerScripts
+--]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local playerGui = player:WaitForChild("PlayerGui")
+local camera = Workspace.CurrentCamera
+
+-- ===== 用户需要替换的图标 =====
+local ICON_ASSET_ID = "rbxassetid://1234567890"
+
+local state = {
+    authenticated = false,
+    executing = false,
+    minimized = false,
+    currentPage = "Dashboard",
+    danceEnabled = false,
+    autoClickEnabled = false,
+    targetAssistEnabled = true,
+    whitelist = {
+        "S-001",
+        "SERVER-001",
+        "COOL-001",
+        tostring(game.JobId),
+    },
+}
+
+local pageMap = {}
+local danceTrack = nil
+local danceAnimationId = "rbxassetid://507770677"
+
+local autoClickTask = nil
+local autoClickUI = nil
+local targetAssistUI = nil
+local targetHighlightMap = {}
+
+local rootGui = Instance.new("ScreenGui")
+rootGui.Name = "CoolScriptUI3"
+rootGui.ResetOnSpawn = false
+rootGui.IgnoreGuiInset = true
+rootGui.DisplayOrder = 999
+rootGui.Parent = playerGui
+
+local function make(className, props)
+    local obj = Instance.new(className)
+    for key, value in pairs(props or {}) do
+        obj[key] = value
+    end
+    return obj
+end
+
+local function applyCorner(instance, radius)
+    local corner = make("UICorner", {
+        CornerRadius = UDim.new(0, radius),
+    })
+    corner.Parent = instance
+end
+
+local function applyStroke(instance, color, thickness)
+    local stroke = make("UIStroke", {
+        ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+        Color = color,
+        Thickness = thickness or 1,
+        Transparency = 0.14,
+    })
+    stroke.Parent = instance
+end
+
+local function applyGradient(instance, colorA, colorB)
+    local gradient = make("UIGradient", {
+        Rotation = 90,
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0, colorA),
+            ColorSequenceKeypoint.new(1, colorB),
+        }),
+    })
+    gradient.Parent = instance
+end
+
+local function doWithGuard(fn)
+    if state.executing then
+        return
+    end
+
+    state.executing = true
+    local ok, err = xpcall(fn, debug.traceback)
+    if not ok then
+        warn("doWithGuard error:", err)
+    end
+
+    task.delay(0.25, function()
+        state.executing = false
+    end)
+end
+
+local function setPageVisible()
+    for name, page in pairs(pageMap) do
+        if page and (page:IsA("Frame") or page:IsA("ScrollingFrame")) then
+            page.Visible = (name == state.currentPage)
+        end
+    end
+end
+
+local function createTextLabel(parent, text, size, position, font, textSize, color, alignment)
+    local label = make("TextLabel", {
+        Parent = parent,
+        Size = size,
+        Position = position,
+        BackgroundTransparency = 1,
+        Text = text,
+        TextColor3 = color or Color3.fromRGB(245,245,245),
+        Font = font or Enum.Font.GothamBold,
+        TextSize = textSize or 18,
+        TextXAlignment = alignment or Enum.TextXAlignment.Left,
+        TextWrapped = true,
+    })
+    return label
+end
+
+local function createTextButton(parent, text, size, position, fontSize, callback)
+    local btn = make("TextButton", {
+        Parent = parent,
+        Size = size,
+        Position = position,
+        BackgroundColor3 = Color3.fromRGB(30,33,40),
+        BorderSizePixel = 0,
+        Text = text,
+        TextColor3 = Color3.fromRGB(245,245,245),
+        Font = Enum.Font.GothamBold,
+        TextSize = fontSize or 14,
+        AutoButtonColor = false,
+        TextWrapped = true,
+    })
+
+    applyCorner(btn, 10)
+    applyStroke(btn, Color3.fromRGB(230,58,58), 1)
+
+    btn.MouseEnter:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(52,52,58)
+    end)
+
+    btn.MouseLeave:Connect(function()
+        btn.BackgroundColor3 = Color3.fromRGB(30,33,40)
+    end)
+
+    if callback then
+        btn.MouseButton1Click:Connect(function()
+            doWithGuard(callback)
+        end)
+    end
+
+    return btn
+end
+
+local function createTextBox(parent, placeholder, size, position)
+    local box = make("TextBox", {
+        Parent = parent,
+        Size = size,
+        Position = position,
+        BackgroundColor3 = Color3.fromRGB(12,13,16),
+        BorderSizePixel = 0,
+        PlaceholderText = placeholder,
+        Text = "",
+        TextColor3 = Color3.fromRGB(245,245,245),
+        PlaceholderColor3 = Color3.fromRGB(168,168,168),
+        Font = Enum.Font.Gotham,
+        TextSize = 16,
+        ClearTextOnFocus = false,
+    })
+    applyCorner(box, 10)
+    applyStroke(box, Color3.fromRGB(230,58,58), 1)
+    return box
+end
+
+local function createSwitch(parent, initialOn, callback)
+    local switchFrame = make("Frame", {
+        Parent = parent,
+        Size = UDim2.new(0, 52, 0, 28),
+        BackgroundColor3 = Color3.fromRGB(25,27,32),
+        BorderSizePixel = 0,
+    })
+    applyCorner(switchFrame, 999)
+
+    local on = initialOn
+    local knob = make("Frame", {
+        Parent = switchFrame,
+        Size = UDim2.new(0, 18, 0, 18),
+        BackgroundColor3 = Color3.fromRGB(255,255,255),
+        BorderSizePixel = 0,
+        Position = on and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9),
+    })
+    applyCorner(knob, 999)
+
+    local function refresh()
+        if on then
+            switchFrame.BackgroundColor3 = Color3.fromRGB(217,43,43)
+            knob:TweenPosition(UDim2.new(1, -21, 0.5, -9), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.18, true)
+        else
+            switchFrame.BackgroundColor3 = Color3.fromRGB(25,27,32)
+            knob:TweenPosition(UDim2.new(0, 3, 0.5, -9), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.18, true)
+        end
+
+        if callback then
+            callback(on)
+        end
+    end
+
+    switchFrame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            on = not on
+            refresh()
+        end
+    end)
+
+    refresh()
+    return switchFrame
+end
+
+local function createRoundImageIcon(parent, size, position, imageId)
+    local bg = make("Frame", {
+        Parent = parent,
+        Size = size,
+        Position = position,
+        BackgroundColor3 = Color3.fromRGB(25,27,32),
+        BorderSizePixel = 0,
+    })
+    applyCorner(bg, 999)
+    applyStroke(bg, Color3.fromRGB(230,58,58), 1)
+
+    local image = make("ImageLabel", {
+        Parent = bg,
+        Size = UDim2.new(1, -8, 1, -8),
+        Position = UDim2.new(0, 4, 0, 4),
+        BackgroundTransparency = 1,
+        Image = imageId,
+        ScaleType = Enum.ScaleType.Fit,
+        BorderSizePixel = 0,
+    })
+
+    return bg, image
+end
+
+-- ===== Loading Screen =====
+local loadingScreen = make("ScreenGui", {
+    Name = "LoadingScreen",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    DisplayOrder = 100,
+    Parent = rootGui,
+})
+
+local loadingBg = make("Frame", {
+    Parent = loadingScreen,
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(9,10,12),
+    BorderSizePixel = 0,
+})
+applyGradient(loadingBg, Color3.fromRGB(11,11,15), Color3.fromRGB(18,18,22))
+
+local loadingCard = make("Frame", {
+    Parent = loadingBg,
+    Size = UDim2.new(0, 430, 0, 210),
+    Position = UDim2.new(0.5, -215, 0.5, -105),
+    BackgroundColor3 = Color3.fromRGB(18,19,24),
+    BorderSizePixel = 0,
+})
+applyCorner(loadingCard, 18)
+applyStroke(loadingCard, Color3.fromRGB(230,58,58), 1)
+
+local loadingGlow = make("Frame", {
+    Parent = loadingCard,
+    Size = UDim2.new(1, 0, 0, 2),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(255,77,77),
+    BorderSizePixel = 0,
+})
+applyCorner(loadingGlow, 999)
+
+createTextLabel(loadingCard, "酷脚本", UDim2.new(1, -20, 0, 30), UDim2.new(0, 10, 0, 18), Enum.Font.GothamBlack, 24, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Center)
+createTextLabel(loadingCard, "启动中...", UDim2.new(1, -20, 0, 18), UDim2.new(0, 10, 0, 48), Enum.Font.GothamMedium, 12, Color3.fromRGB(188,188,188), Enum.TextXAlignment.Center)
+createTextLabel(loadingCard, "正在加载中，亲爱的用户，欢迎使用酷脚本🥰", UDim2.new(1, -30, 0, 56), UDim2.new(0, 15, 0, 78), Enum.Font.GothamBold, 20, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Center)
+
+local loadingTrack = make("Frame", {
+    Parent = loadingCard,
+    Size = UDim2.new(0, 260, 0, 14),
+    Position = UDim2.new(0.5, -130, 0, 150),
+    BackgroundColor3 = Color3.fromRGB(30,30,34),
+    BorderSizePixel = 0,
+})
+applyCorner(loadingTrack, 999)
+applyStroke(loadingTrack, Color3.fromRGB(255,255,255), 1)
+
+local loadingFill = make("Frame", {
+    Parent = loadingTrack,
+    Size = UDim2.new(0.38, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(217,43,43),
+    BorderSizePixel = 0,
+})
+applyCorner(loadingFill, 999)
+
+local loadStart = tick()
+task.spawn(function()
+    while loadingScreen and loadingScreen.Parent do
+        local t = (tick() - loadStart) % 1.8
+        local p = 0.2 + ((t / 1.8) * 0.8)
+        loadingFill.Size = UDim2.new(p, 0, 1, 0)
+        task.wait(0.03)
+    end
+end)
+
+-- ===== Auth Screen =====
+local authScreen = make("ScreenGui", {
+    Name = "AuthScreen",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    DisplayOrder = 101,
+    Parent = rootGui,
+    Visible = false,
+})
+
+local authBg = make("Frame", {
+    Parent = authScreen,
+    Size = UDim2.new(1, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(9,10,12),
+    BorderSizePixel = 0,
+})
+applyGradient(authBg, Color3.fromRGB(11,11,15), Color3.fromRGB(18,18,22))
+
+local authCard = make("Frame", {
+    Parent = authBg,
+    Size = UDim2.new(0, 420, 0, 240),
+    Position = UDim2.new(0.5, -210, 0.5, -120),
+    BackgroundColor3 = Color3.fromRGB(18,19,24),
+    BorderSizePixel = 0,
+})
+applyCorner(authCard, 18)
+applyStroke(authCard, Color3.fromRGB(230,58,58), 1)
+
+createTextLabel(authCard, "卡密验证", UDim2.new(1, -40, 0, 30), UDim2.new(0, 20, 0, 16), Enum.Font.GothamBlack, 24, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Center)
+createTextLabel(authCard, "Password Verification", UDim2.new(1, -40, 0, 18), UDim2.new(0, 20, 0, 48), Enum.Font.Gotham, 11, Color3.fromRGB(188,188,188), Enum.TextXAlignment.Center)
+
+local authInput = createTextBox(authCard, "请输入卡密", UDim2.new(1, -40, 0, 44), UDim2.new(0, 20, 0, 82))
+local authHint = createTextLabel(authCard, "请输入正确卡密，方可进入主界面", UDim2.new(1, -30, 0, 24), UDim2.new(0, 15, 0, 194), Enum.Font.Gotham, 12, Color3.fromRGB(204,204,204), Enum.TextXAlignment.Center)
+
+local authBtn = createTextButton(authCard, "验证酷脚本", UDim2.new(1, -40, 0, 46), UDim2.new(0, 20, 0, 140), 14, function()
+    local password = authInput.Text:trim()
+    local correctPassword = "hi"
+
+    if password == correctPassword then
+        authHint.Text = "验证成功，正在进入酷脚本..."
+        authHint.TextColor3 = Color3.fromRGB(165,255,215)
+        state.authenticated = true
+
+        task.delay(0.45, function()
+            authScreen.Visible = false
+            appScreen.Visible = true
+            state.currentPage = "Dashboard"
+            setPageVisible()
+        end)
+    else
+        authHint.Text = "卡密错误，请重新输入"
+        authHint.TextColor3 = Color3.fromRGB(255,159,159)
+        authInput.Text = ""
+        authInput:CaptureFocus()
+    end
+end)
+
+authInput.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        authBtn:Click()
+    end
+end)
+
+-- ===== App Screen =====
+local appScreen = make("ScreenGui", {
+    Name = "AppScreen",
+    ResetOnSpawn = false,
+    IgnoreGuiInset = true,
+    DisplayOrder = 200,
+    Parent = rootGui,
+    Visible = false,
+})
+
+local mainWindow = make("Frame", {
+    Parent = appScreen,
+    Size = UDim2.new(0, 430, 0, 420),
+    Position = UDim2.new(0.5, -215, 0.5, -210),
+    BackgroundColor3 = Color3.fromRGB(18,19,24),
+    BorderSizePixel = 0,
+})
+applyCorner(mainWindow, 16)
+applyStroke(mainWindow, Color3.fromRGB(230,58,58), 1)
+
+local topBar = make("Frame", {
+    Parent = mainWindow,
+    Size = UDim2.new(1, 0, 0, 42),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(12,13,17),
+    BorderSizePixel = 0,
+})
+applyCorner(topBar, 16)
+
+local scriptIconBg, scriptIcon = createRoundImageIcon(topBar, UDim2.new(0, 30, 0, 30), UDim2.new(0, 10, 0.5, -15), ICON_ASSET_ID)
+createTextLabel(topBar, "酷脚本", UDim2.new(1, -110, 1, 0), UDim2.new(0, 48, 0, 0), Enum.Font.GothamBold, 15, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+
+local minimizeButton = createTextButton(topBar, "—", UDim2.new(0, 24, 0, 20), UDim2.new(1, -30, 0.5, -10), 16, function()
+    state.minimized = not state.minimized
+    if state.minimized then
+        mainWindow.Visible = false
+        minimizedBar.Visible = true
+    else
+        mainWindow.Visible = true
+        minimizedBar.Visible = false
+    end
+end)
+
+-- ===== Content =====
+local content = make("Frame", {
+    Parent = mainWindow,
+    Size = UDim2.new(1, -16, 1, -52),
+    Position = UDim2.new(0, 8, 0, 46),
+    BackgroundColor3 = Color3.fromRGB(10,10,12),
+    BorderSizePixel = 0,
+})
+applyCorner(content, 12)
+
+local sidebar = make("Frame", {
+    Parent = content,
+    Size = UDim2.new(0, 120, 1, 0),
+    Position = UDim2.new(0, 0, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(14,15,19),
+    BorderSizePixel = 0,
+})
+applyStroke(sidebar, Color3.fromRGB(230,58,58), 1)
+
+local mainContent = make("Frame", {
+    Parent = content,
+    Size = UDim2.new(1, -120, 1, 0),
+    Position = UDim2.new(0, 120, 0, 0),
+    BackgroundColor3 = Color3.fromRGB(12,13,16),
+    BorderSizePixel = 0,
+})
+applyStroke(mainContent, Color3.fromRGB(230,58,58), 1)
+
+local function createPage(name)
+    local page = make("ScrollingFrame", {
+        Parent = mainContent,
+        Name = name,
+        Size = UDim2.new(1, 0, 1, 0),
+        Position = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+        CanvasSize = UDim2.new(0, 0, 0, 650),
+        ScrollBarThickness = 4,
+        Visible = false,
+    })
+    pageMap[name] = page
+    return page
+end
+
+local dashboard = createPage("Dashboard")
+local settings = createPage("Settings")
+local translation = createPage("Translation")
+local server = createPage("Server")
+local changelog = createPage("Changelog")
+local features = createPage("Features")
+
+-- ===== Dashboard =====
+createTextLabel(dashboard, "酷脚本控制台", UDim2.new(1, -20, 0, 28), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBlack, 18, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+createTextLabel(dashboard, "Cool Script Console", UDim2.new(1, -20, 0, 16), UDim2.new(0, 12, 0, 38), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+local dashCards = {
+    {title = "脚本状态", value = "已启动"},
+    {title = "授权状态", value = "已验证"},
+    {title = "默认主题", value = "红色"},
+    {title = "当前版本", value = "v1.00"},
+}
+
+for i, data in ipairs(dashCards) do
+    local card = make("Frame", {
+        Parent = dashboard,
+        Size = UDim2.new(0, 150, 0, 96),
+        Position = UDim2.new(0, 8 + ((i - 1) % 2) * 158, 0, 70 + math.floor((i - 1) / 2) * 110),
+        BackgroundColor3 = Color3.fromRGB(24,25,31),
+        BorderSizePixel = 0,
+    })
+    applyCorner(card, 10)
+    applyStroke(card, Color3.fromRGB(230,58,58), 1)
+
+    createTextLabel(card, data.title, UDim2.new(1, -14, 0, 18), UDim2.new(0, 10, 0, 10), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+    createTextLabel(card, data.value, UDim2.new(1, -14, 0, 28), UDim2.new(0, 10, 0, 28), Enum.Font.GothamBold, 16, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+end
+
+-- ===== Settings =====
+createTextLabel(settings, "酷脚本设置", UDim2.new(1, -20, 0, 28), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBlack, 18, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+createTextLabel(settings, "Cool Script Settings", UDim2.new(1, -20, 0, 16), UDim2.new(0, 12, 0, 38), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+local optionRows = {
+    {"运动设置", "Movement"},
+    {"跳跃设置", "Jump"},
+    {"重力设置", "Gravity"},
+    {"飞行设置", "Flight"},
+    {"夜视增强", "Night Vision"},
+    {"去雾增强", "Fog Removal"},
+    {"舞蹈功能", "Dance"},
+    {"自动点击器", "Auto Clicker"},
+    {"目标辅助", "Target Assist"},
+}
+
+local rowY = 70
+for _, item in ipairs(optionRows) do
+    local row = make("Frame", {
+        Parent = settings,
+        Size = UDim2.new(1, -20, 0, 46),
+        Position = UDim2.new(0, 10, 0, rowY),
+        BackgroundColor3 = Color3.fromRGB(24,25,31),
+        BorderSizePixel = 0,
+    })
+    applyCorner(row, 10)
+    applyStroke(row, Color3.fromRGB(230,58,58), 1)
+
+    createTextLabel(row, item[1], UDim2.new(0.7, 0, 0, 18), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBold, 12, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+    createTextLabel(row, item[2], UDim2.new(0.7, 0, 0, 12), UDim2.new(0, 12, 0, 25), Enum.Font.Gotham, 9, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+    local sw
+    if item[1] == "舞蹈功能" then
+        sw = createSwitch(row, false, function(enabled)
+            state.danceEnabled = enabled
+            local character = player.Character
+            if not character then return end
+            local humanoid = character:FindFirstChildOfClass("Humanoid")
+            if not humanoid then return end
+
+            local animator = humanoid:FindFirstChildOfClass("Animator")
+            if not animator then
+                animator = Instance.new("Animator")
+                animator.Parent = humanoid
+            end
+
+            if enabled then
+                if not danceTrack then
+                    local anim = Instance.new("Animation")
+                    anim.AnimationId = danceAnimationId
+                    danceTrack = animator:LoadAnimation(anim)
+                end
+
+                if danceTrack then
+                    danceTrack:Play(0.2, 1, 1)
+                    danceTrack.Looped = true
+                end
+            else
+                if danceTrack and danceTrack.IsPlaying then
+                    danceTrack:Stop()
+                end
+            end
+        end)
+    elseif item[1] == "自动点击器" then
+        sw = createSwitch(row, false, function(enabled)
+            state.autoClickEnabled = enabled
+            if enabled then
+                if autoClickUI then
+                    autoClickUI.panel.Visible = true
+                    autoClickUI.status.Text = "状态：已开启"
+                    autoClickUI.status.TextColor3 = Color3.fromRGB(180,255,220)
+                    autoClickUI.toggle.Text = "关闭"
+                end
+                startAutoClicker()
+            else
+                if autoClickUI then
+                    autoClickUI.panel.Visible = false
+                end
+                stopAutoClicker()
+            end
+        end)
+    elseif item[1] == "目标辅助" then
+        sw = createSwitch(row, true, function(enabled)
+            state.targetAssistEnabled = enabled
+            if targetAssistUI then
+                if enabled then
+                    targetAssistUI.panel.Visible = true
+                else
+                    targetAssistUI.panel.Visible = false
+                    targetAssistUI.targetLabel.Text = ""
+                    targetAssistUI.lockBox.Visible = false
+                    clearTargetHighlights()
+                end
+            end
+        end)
+    else
+        sw = createSwitch(row, true, function() end)
+    end
+
+    sw.Position = UDim2.new(1, -62, 0.5, -14)
+    rowY += 56
+end
+
+-- ===== Translation =====
+createTextLabel(translation, "自动翻译", UDim2.new(1, -20, 0, 28), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBlack, 18, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+createTextLabel(translation, "Auto Translate", UDim2.new(1, -20, 0, 16), UDim2.new(0, 12, 0, 38), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+local inputBox = createTextBox(translation, "请输入文本", UDim2.new(1, -24, 0, 110), UDim2.new(0, 12, 0, 64))
+inputBox.Text = "正在加载中，亲爱的用户，欢迎使用酷脚本🥰"
+inputBox.MultiLine = true
+
+local resultBox = createTextBox(translation, "翻译结果", UDim2.new(1, -24, 0, 110), UDim2.new(0, 12, 0, 184))
+resultBox.Text = "Loading in progress, dear user, welcome to Cool Script🥰"
+resultBox.ReadOnly = true
+
+local langSelect = createTextButton(translation, "中文 → 英文", UDim2.new(0, 104, 0, 30), UDim2.new(0, 12, 0, 300), 12, function()
+    local text = langSelect.Text
+    if text == "中文 → 英文" then
+        langSelect.Text = "英文 → 中文"
+    elseif text == "英文 → 中文" then
+        langSelect.Text = "中文 → 日文"
+    elseif text == "中文 → 日文" then
+        langSelect.Text = "中文 → 韩文"
+    else
+        langSelect.Text = "中文 → 英文"
+    end
+end)
+
+local translateBtn = createTextButton(translation, "翻译", UDim2.new(0, 90, 0, 30), UDim2.new(0, 128, 0, 300), 12, function()
+    local source = inputBox.Text
+    if source == "" then
+        resultBox.Text = ""
+        return
+    end
+
+    if source:find("正在加载中") then
+        resultBox.Text = "Loading in progress, dear user, welcome to Cool Script🥰"
+    elseif source:find("酷脚本") then
+        resultBox.Text = "Cool Script"
+    else
+        resultBox.Text = "暂未提供该文本的翻译"
+    end
+end)
+
+local copyBtn = createTextButton(translation, "复制", UDim2.new(0, 80, 0, 30), UDim2.new(0, 230, 0, 300), 12, function()
+    copyBtn.Text = "已复制"
+    task.delay(0.8, function()
+        copyBtn.Text = "复制"
+    end)
+end)
+
+-- ===== Server =====
+createTextLabel(server, "服务器功能", UDim2.new(1, -20, 0, 28), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBlack, 18, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+createTextLabel(server, "Server Features", UDim2.new(1, -20, 0, 16), UDim2.new(0, 12, 0, 38), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+local serverIdBox = createTextBox(server, "服务器 ID", UDim2.new(0, 180, 0, 40), UDim2.new(0, 12, 0, 74))
+serverIdBox.Text = tostring(game.JobId)
+
+local serverStatus = createTextLabel(server, "允许访问", UDim2.new(0, 110, 0, 24), UDim2.new(0, 206, 0, 80), Enum.Font.GothamBold, 12, Color3.fromRGB(180,255,220), Enum.TextXAlignment.Center)
+serverStatus.BackgroundColor3 = Color3.fromRGB(43,207,154)
+serverStatus.BackgroundTransparency = 0.2
+applyCorner(serverStatus, 999)
+
+local serverCheckBtn = createTextButton(server, "检测", UDim2.new(0, 90, 0, 30), UDim2.new(0, 12, 0, 126), 12, function()
+    local id = serverIdBox.Text
+    local found = false
+    for _, value in ipairs(state.whitelist) do
+        if tostring(value) == tostring(id) then
+            found = true
+            break
+        end
+    end
+
+    if found then
+        serverStatus.Text = "允许访问"
+        serverStatus.TextColor3 = Color3.fromRGB(180,255,220)
+        serverStatus.BackgroundColor3 = Color3.fromRGB(43,207,154)
+    else
+        serverStatus.Text = "拒绝访问"
+        serverStatus.TextColor3 = Color3.fromRGB(255,180,180)
+        serverStatus.BackgroundColor3 = Color3.fromRGB(110, 35, 35)
+    end
+end)
+
+local depBtn = createTextButton(server, "已弃用按钮", UDim2.new(0, 140, 0, 30), UDim2.new(0, 110, 0, 126), 12, function()
+    local id = serverIdBox.Text
+    local allowed = false
+    for _, value in ipairs(state.whitelist) do
+        if tostring(value) == tostring(id) then
+            allowed = true
+            break
+        end
+    end
+
+    if not allowed then
+        serverStatus.Text = "拒绝访问"
+        serverStatus.TextColor3 = Color3.fromRGB(255,180,180)
+        serverStatus.BackgroundColor3 = Color3.fromRGB(110, 35, 35)
+        return
+    end
+
+    warn("Deprecated button enabled for whitelisted server:", id)
+end)
+depBtn.BackgroundColor3 = Color3.fromRGB(120, 26, 26)
+
+-- ===== Changelog =====
+createTextLabel(changelog, "更新日志", UDim2.new(1, -20, 0, 28), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBlack, 18, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+createTextLabel(changelog, "Changelog", UDim2.new(1, -20, 0, 16), UDim2.new(0, 12, 0, 38), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+local logItems = {
+    "酷脚本 v1.00：新增启动页、卡密验证、黑红 UI",
+    "修复重复点击导致的重复加载问题",
+    "优化页面切换和状态防冲突",
+    "加入舞蹈功能和本地自动点击器",
+    "加入本地目标辅助显示",
+}
+
+local logY = 70
+for _, item in ipairs(logItems) do
+    local box = make("Frame", {
+        Parent = changelog,
+        Size = UDim2.new(1, -20, 0, 58),
+        Position = UDim2.new(0, 10, 0, logY),
+        BackgroundColor3 = Color3.fromRGB(24,25,31),
+        BorderSizePixel = 0,
+    })
+    applyCorner(box, 10)
+    applyStroke(box, Color3.fromRGB(230,58,58), 1)
+
+    createTextLabel(box, item, UDim2.new(1, -18, 0, 38), UDim2.new(0, 10, 0, 10), Enum.Font.Gotham, 11, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+    logY += 68
+end
+
+-- ===== Features =====
+createTextLabel(features, "功能说明", UDim2.new(1, -20, 0, 28), UDim2.new(0, 12, 0, 10), Enum.Font.GothamBlack, 18, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+createTextLabel(features, "Feature Guide", UDim2.new(1, -20, 0, 16), UDim2.new(0, 12, 0, 38), Enum.Font.Gotham, 10, Color3.fromRGB(168,168,168), Enum.TextXAlignment.Left)
+
+local featureList = {
+    "加载页：启动动画与能量条加载",
+    "卡密验证：hi，正确后进入主界面",
+    "自动翻译：中文、英文等文本转换",
+    "服务器功能：白名单检测与弃用按钮控制",
+    "舞蹈功能：持续播放舞蹈动作",
+    "自动点击器：本地 UI 点击脉冲，每秒 20 次",
+    "目标辅助：显示最近目标、距离、锁定提示",
+}
+
+local fy = 70
+for _, item in ipairs(featureList) do
+    local box = make("Frame", {
+        Parent = features,
+        Size = UDim2.new(1, -20, 0, 48),
+        Position = UDim2.new(0, 10, 0, fy),
+        BackgroundColor3 = Color3.fromRGB(24,25,31),
+        BorderSizePixel = 0,
+    })
+    applyCorner(box, 10)
+    applyStroke(box, Color3.fromRGB(230,58,58), 1)
+    createTextLabel(box, item, UDim2.new(1, -18, 0, 28), UDim2.new(0, 10, 0, 10), Enum.Font.Gotham, 11, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+    fy += 58
+end
+
+-- ===== Sidebar Buttons =====
+local sidebarButtons = {
+    {"控制台", "Dashboard"},
+    {"设置", "Settings"},
+    {"翻译", "Translation"},
+    {"服务器", "Server"},
+    {"日志", "Changelog"},
+    {"说明", "Features"},
+}
+
+local currentY = 12
+for _, item in ipairs(sidebarButtons) do
+    local btn = createTextButton(sidebar, item[1], UDim2.new(1, -16, 0, 28), UDim2.new(0, 8, 0, currentY), 12, function()
+        state.currentPage = item[2]
+        setPageVisible()
+    end)
+    currentY += 34
+end
+
+-- ===== Minimized Bar =====
+local minimizedBar = make("Frame", {
+    Parent = appScreen,
+    Size = UDim2.new(0, 220, 0, 42),
+    Position = UDim2.new(0.5, -110, 0.5, 0),
+    BackgroundColor3 = Color3.fromRGB(18,19,24),
+    BorderSizePixel = 0,
+    Visible = false,
+})
+applyCorner(minimizedBar, 12)
+applyStroke(minimizedBar, Color3.fromRGB(230,58,58), 1)
+
+local miniAvatar = make("Frame", {
+    Parent = minimizedBar,
+    Size = UDim2.new(0, 28, 0, 28),
+    Position = UDim2.new(0, 8, 0.5, -14),
+    BackgroundColor3 = Color3.fromRGB(31,34,42),
+    BorderSizePixel = 0,
+})
+applyCorner(miniAvatar, 999)
+applyStroke(miniAvatar, Color3.fromRGB(230,58,58), 1)
+
+local miniIcon = make("ImageLabel", {
+    Parent = miniAvatar,
+    Size = UDim2.new(1, -8, 1, -8),
+    Position = UDim2.new(0, 4, 0, 4),
+    BackgroundTransparency = 1,
+    Image = ICON_ASSET_ID,
+    ScaleType = Enum.ScaleType.Fit,
+    BorderSizePixel = 0,
+})
+
+createTextLabel(minimizedBar, "酷脚本", UDim2.new(1, -60, 1, 0), UDim2.new(0, 46, 0, 0), Enum.Font.GothamBold, 14, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+
+local expandBtn = createTextButton(minimizedBar, "□", UDim2.new(0, 22, 0, 22), UDim2.new(1, -30, 0.5, -11), 16, function()
+    state.minimized = false
+    mainWindow.Visible = true
+    minimizedBar.Visible = false
+end)
+expandBtn.BackgroundColor3 = Color3.fromRGB(30,33,40)
+
+-- ===== Auto Clicker =====
+local function createAutoClickerUI()
+    local screenGui = make("ScreenGui", {
+        Name = "AutoClickerLocalUI",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 500,
+        Parent = rootGui,
+    })
+
+    local panel = make("Frame", {
+        Parent = screenGui,
+        Size = UDim2.new(0, 180, 0, 90),
+        Position = UDim2.new(0.5, -90, 0.5, 20),
+        BackgroundColor3 = Color3.fromRGB(18,19,24),
+        BorderSizePixel = 0,
+    })
+    applyCorner(panel, 14)
+    applyStroke(panel, Color3.fromRGB(230,58,58), 1)
+    panel.Visible = false
+
+    local title = createTextLabel(panel, "自动点击器", UDim2.new(1, -20, 0, 20), UDim2.new(0, 10, 0, 10), Enum.Font.GothamBold, 15, Color3.fromRGB(245,245,245), Enum.TextXAlignment.Left)
+    local status = createTextLabel(panel, "状态：已关闭", UDim2.new(1, -20, 0, 18), UDim2.new(0, 10, 0, 34), Enum.Font.Gotham, 11, Color3.fromRGB(255,180,180), Enum.TextXAlignment.Left)
+
+    local toggle = createTextButton(panel, "启动", UDim2.new(1, -20, 0, 28), UDim2.new(0, 10, 0, 56), 12, function()
+        state.autoClickEnabled = not state.autoClickEnabled
+        if state.autoClickEnabled then
+            toggle.Text = "关闭"
+            status.Text = "状态：已开启"
+            status.TextColor3 = Color3.fromRGB(180,255,220)
+            startAutoClicker()
+        else
+            toggle.Text = "启动"
+            status.Text = "状态：已关闭"
+            status.TextColor3 = Color3.fromRGB(255,180,180)
+            stopAutoClicker()
+        end
+    end)
+
+    local pulseNode = make("Frame", {
+        Parent = screenGui,
+        Size = UDim2.new(0, 32, 0, 32),
+        Position = UDim2.new(0.5, -16, 0.5, -16),
+        BackgroundColor3 = Color3.fromRGB(255, 90, 90),
+        BorderSizePixel = 0,
+        Visible = false,
+    })
+    applyCorner(pulseNode, 999)
+    applyStroke(pulseNode, Color3.fromRGB(255,255,255), 1)
+
+    return {
+        panel = panel,
+        toggle = toggle,
+        status = status,
+        pulseNode = pulseNode,
+    }
+end
+
+local function triggerClickPulse()
+    if not state.autoClickEnabled then
+        return
+    end
+
+    autoClickUI.pulseNode.Visible = true
+    autoClickUI.pulseNode.Size = UDim2.new(0, 32, 0, 32)
+
+    local t = 0
+    local connection
+
+    connection = RunService.RenderStepped:Connect(function(dt)
+        t += dt
+        autoClickUI.pulseNode.Size = UDim2.new(0, 32 + t * 90, 0, 32 + t * 90)
+        autoClickUI.pulseNode.Position = UDim2.new(0.5, -(16 + t * 45), 0.5, -(16 + t * 45))
+        autoClickUI.pulseNode.BackgroundTransparency = 0.15 + (t * 0.7)
+        if t >= 0.18 then
+            autoClickUI.pulseNode.Visible = false
+            connection:Disconnect()
+        end
+    end)
+end
+
+local function startAutoClicker()
+    if autoClickTask then
+        return
+    end
+
+    autoClickUI.pulseNode.Visible = true
+    autoClickTask = task.spawn(function()
+        while state.autoClickEnabled do
+            triggerClickPulse()
+            task.wait(1 / 20)
+        end
+    end)
+end
+
+local function stopAutoClicker()
+    if autoClickTask then
+        task.cancel(autoClickTask)
+        autoClickTask = nil
+    end
+
+    autoClickUI.pulseNode.Visible = false
+end
+
+-- ===== Target Assist =====
+local function clearTargetHighlights()
+    for _, highlight in pairs(targetHighlightMap) do
+        if highlight and highlight.Parent then
+            highlight:Destroy()
+        end
+    end
+    targetHighlightMap = {}
+end
+
+local function createTargetHighlight(character)
+    if targetHighlightMap[character] then
+        return
+    end
+
+    local highlight = Instance.new("Highlight")
+    highlight.FillTransparency = 0.6
+    highlight.OutlineTransparency = 0.15
+    highlight.FillColor = Color3.fromRGB(255, 70, 70)
+    highlight.OutlineColor = Color3.fromRGB(255, 90, 90)
+    highlight.Adornee = character
+    highlight.Parent = Workspace
+    targetHighlightMap[character] = highlight
+end
+
+local function getNearestTarget()
+    local nearestInfo = nil
+
+    for _, other in ipairs(Players:GetPlayers()) do
+        if other ~= player and other.Character and other.Character:FindFirstChild("Humanoid") and other.Character.Humanoid.Health > 0 then
+            local root = other.Character:FindFirstChild("HumanoidRootPart")
+            local localRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if root and localRoot then
+                local distance = (root.Position - localRoot.Position).Magnitude
+                if distance <= 120 then
+                    local screenPos, onScreen = camera:WorldToViewportPoint(root.Position)
+                    if onScreen then
+                        local dirToTarget = (root.Position - camera.CFrame.Position)
+                        local viewDir = camera.CFrame.LookVector
+                        local dot = dirToTarget.Unit:Dot(viewDir)
+                        if dot > 0.5 then
+                            if not nearestInfo or distance < nearestInfo.distance then
+                                nearestInfo = {
+                                    name = other.Name,
+                                    distance = distance,
+                                    screenPos = Vector2.new(screenPos.X, screenPos.Y),
+                                    character = other.Character,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return nearestInfo
+end
+
+local function createTargetAssistUI()
+    local gui = make("ScreenGui", {
+        Name = "TargetAssistScreen",
+        ResetOnSpawn = false,
+        IgnoreGuiInset = true,
+        DisplayOrder = 600,
+        Parent = rootGui,
+    })
+
+    local targetLabel = createTextLabel(gui, "", UDim2.new(0, 200, 0, 24), UDim2.new(0.5, -100, 0.5, -110), Enum.Font.GothamBold, 15, Color3.fromRGB(255, 90, 90), Enum.TextXAlignment.Center)
+    targetLabel.TextStrokeTransparency = 0.3
+
+    local lockBox = make("Frame", {
+        Parent = gui,
+        Size = UDim2.new(0, 120, 0, 34),
+        Position = UDim2.new(0.5, -60, 0.5, -140),
+        BackgroundColor3 = Color3.fromRGB(18,19,24),
+        BackgroundTransparency = 0.25,
+        BorderSizePixel = 0,
+    })
+    applyCorner(lockBox, 10)
+    applyStroke(lockBox, Color3.fromRGB(255,90,90), 1)
+    lockBox.Visible = false
+
+    local lockText = createTextLabel(lockBox, "TARGET", UDim2.new(1, -12, 1, -8), UDim2.new(0, 6, 0, 4), Enum.Font.GothamBold, 12, Color3.fromRGB(255,255,255), Enum.TextXAlignment.Center)
+
+    local reticleHolder = make("Frame", {
+        Parent = gui,
+        Size = UDim2.new(0, 18, 0, 18),
+        Position = UDim2.new(0.5, -9, 0.5, -9),
+        BackgroundTransparency = 1,
+        BorderSizePixel = 0,
+    })
+
+    local r1 = make("Frame", {
+        Parent = reticleHolder,
+        Size = UDim2.new(0, 28, 0, 2),
+        Position = UDim2.new(0.5, -14, 0.5, -1),
+        BackgroundColor3 = Color3.fromRGB(255,255,255),
+        BorderSizePixel = 0,
+    })
+
+    local r2 = make("Frame", {
+        Parent = reticleHolder,
+        Size = UDim2.new(0, 2, 0, 28),
+        Position = UDim2.new(0.5, -1, 0.5, -14),
+        BackgroundColor3 = Color3.fromRGB(255,255,255),
+        BorderSizePixel = 0,
+    })
+
+    return {
+        panel = gui,
+        targetLabel = targetLabel,
+        lockBox = lockBox,
+        reticleHolder = reticleHolder,
+        r1 = r1,
+        r2 = r2,
+    }
+end
+
+local function updateTargetAssistUI()
+    if not targetAssistUI then
+        return
+    end
+
+    if not state.targetAssistEnabled then
+        targetAssistUI.panel.Visible = false
+        targetAssistUI.targetLabel.Text = ""
+        targetAssistUI.lockBox.Visible = false
+        clearTargetHighlights()
+        return
+    end
+
+    local targetInfo = getNearestTarget()
+    if targetInfo then
+        targetAssistUI.panel.Visible = true
+        targetAssistUI.targetLabel.Text = string.format("%s | %.1f studs", targetInfo.name, targetInfo.distance)
+        targetAssistUI.targetLabel.Position = UDim2.new(0, targetInfo.screenPos.X - 100, 0, targetInfo.screenPos.Y - 18)
+        targetAssistUI.lockBox.Visible = true
+        targetAssistUI.lockBox.Position = UDim2.new(0, targetInfo.screenPos.X - 60, 0, targetInfo.screenPos.Y - 64)
+        targetAssistUI.r1.BackgroundColor3 = Color3.fromRGB(255,90,90)
+        targetAssistUI.r2.BackgroundColor3 = Color3.fromRGB(255,90,90)
+
+        clearTargetHighlights()
+        createTargetHighlight(targetInfo.character)
+    else
+        targetAssistUI.targetLabel.Text = ""
+        targetAssistUI.lockBox.Visible = false
+        targetAssistUI.r1.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        targetAssistUI.r2.BackgroundColor3 = Color3.fromRGB(255,255,255)
+        clearTargetHighlights()
+    end
+end
+
+-- ===== Dragging =====
+local dragStart, dragStartPos
+local function startDrag(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+        return
+    end
+
+    dragStart = input.Position
+    dragStartPos = mainWindow.Position
+
+    while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+        if dragStart and dragStartPos then
+            local delta = input.Position - dragStart
+            mainWindow.Position = UDim2.new(
+                dragStartPos.X.Scale,
+                dragStartPos.X.Offset + delta.X,
+                dragStartPos.Y.Scale,
+                dragStartPos.Y.Offset + delta.Y
+            )
+        end
+        task.wait()
+    end
+end
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        startDrag(input)
+    end
+end)
+
+-- ===== Initialize =====
+autoClickUI = createAutoClickerUI()
+targetAssistUI = createTargetAssistUI()
+setPageVisible()
+
+-- ===== Runtime =====
+RunService.RenderStepped:Connect(function()
+    if state.targetAssistEnabled then
+        updateTargetAssistUI()
+    end
+end)
+
+task.delay(1.6, function()
+    if loadingScreen then
+        loadingScreen:Destroy()
+    end
+    authScreen.Visible = true
+    authInput:CaptureFocus()
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then
+        return
+    end
+
+    if input.KeyCode == Enum.KeyCode.H then
+        state.danceEnabled = not state.danceEnabled
+        local character = player.Character
+        if not character then return end
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then return end
+
+        local animator = humanoid:FindFirstChildOfClass("Animator")
+        if not animator then
+            animator = Instance.new("Animator")
+            animator.Parent = humanoid
+        end
+
+        if state.danceEnabled then
+            if not danceTrack then
+                local anim = Instance.new("Animation")
+                anim.AnimationId = danceAnimationId
+                danceTrack = animator:LoadAnimation(anim)
+            end
+
+            if danceTrack then
+                danceTrack:Play(0.2, 1, 1)
+                danceTrack.Looped = true
+            end
+        else
+            if danceTrack and danceTrack.IsPlaying then
+                danceTrack:Stop()
+            end
+        end
+    end
+
+    if input.KeyCode == Enum.KeyCode.J then
+        state.autoClickEnabled = not state.autoClickEnabled
+        if state.autoClickEnabled then
+            autoClickUI.toggle.Text = "关闭"
+            autoClickUI.status.Text = "状态：已开启"
+            autoClickUI.status.TextColor3 = Color3.fromRGB(180,255,220)
+            autoClickUI.panel.Visible = true
+            startAutoClicker()
+        else
+            autoClickUI.toggle.Text = "启动"
+            autoClickUI.status.Text = "状态：已关闭"
+            autoClickUI.status.TextColor3 = Color3.fromRGB(255,180,180)
+            autoClickUI.panel.Visible = false
+            stopAutoClicker()
+        end
+    end
+
+    if input.KeyCode == Enum.KeyCode.K then
+        state.targetAssistEnabled = not state.targetAssistEnabled
+        if not state.targetAssistEnabled then
+            clearTargetHighlights()
+            targetAssistUI.targetLabel.Text = ""
+            targetAssistUI.lockBox.Visible = false
+        end
+    end
+end)
