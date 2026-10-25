@@ -30,7 +30,7 @@ local Window = WindUI:CreateWindow({
         -- ↓ Optional. You can remove it.
         Key = { "DMHUBNB" },
         
-        Note = "请输入免费卡密（如没有卡密请加入Q群310057979）.",
+        Note = "请输入免费卡密 .",
         
         -- ↓ Optional. You can remove it.
         Thumbnail = {
@@ -78,7 +78,7 @@ WindUI:Notify({
 
 WindUI:Notify({
     Title = "DMHUB脚本通知",
-    Content = "作者:一只屑冬某、HPttttt😏",
+    Content = "作者:一只屑冬某、HPttttt",
     Duration = 10, -- 10 seconds
     Icon = "bird",
 })
@@ -90,7 +90,7 @@ local Tab = Window:Tab({
 })
 
 local Paragraph = Tab:Paragraph({
-    Title = "作者一只屑冬某、HPttttt😏",
+    Title = "作者一只屑冬某、HPttttt",
     Desc = "QQ群主群310057979 ",
     Image = "rbxassetid://75198135626218",
     ImageSize = 42,
@@ -110,15 +110,6 @@ local Paragraph = Tab:Paragraph({
 local Paragraph = Tab:Paragraph({
     Title = "三天一更",
     Desc = "QQ群主群310057979 ",
-    Image = "rbxassetid://75198135626218",
-    ImageSize = 42,
-    Thumbnail = "rbxassetid://103506480252017",
-    ThumbnailSize = 0,
-})
-
-local Paragraph = Tab:Paragraph({
-    Title = "快过年了，一只屑冬某在这给你们提前拜年了祝你们新年快乐，祝你们身体健康，万事如意",
-    Desc = "",
     Image = "rbxassetid://75198135626218",
     ImageSize = 42,
     Thumbnail = "rbxassetid://103506480252017",
