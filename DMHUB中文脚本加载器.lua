@@ -28,7 +28,7 @@ local Window = WindUI:CreateWindow({
     -- !  ↓  if you DON'T need the key system
     KeySystem = { 
         -- ↓ Optional. You can remove it.
-        Key = { "shenmiNB" },
+        Key = { "DMHUBNB" },
         
         Note = "请输入免费卡密（如没有卡密请加入Q群310057979）.",
         
@@ -190,11 +190,11 @@ local Slider = Tab:Slider({
 })
 
 local Button = Tab:Button({
-    Title = "shenmi飞行",
+    Title = "DMHUB飞行",
     Desc = "",
     Locked = false,
     Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/nknmk88l/-78-/refs/heads/main/飞行源码.lua"))()
+        loadstring(game:HttpGet（""))()
     end
 })
 
