@@ -493,7 +493,7 @@ local Window = WindUI:CreateWindow({
     Author = "作者:一只屑冬某",
     Folder = "WindUI_Example",
     Size = UDim2.fromOffset(300, 350),
-    Theme = "Dark",
+    Theme = "Rainbow",
     User = {
         Enabled = true,
         Anonymous = false,
@@ -508,7 +508,7 @@ local Window = WindUI:CreateWindow({
     SideBarWidth = 220,
     ScrollBarEnabled = true,
     HideSearchBar = false,
-    Background = "rbxassetid://96771724379864",
+    Background = "",
 })
 
 Window:Tag({
@@ -699,7 +699,7 @@ function Dropdown(a, b, c, d, e)
 end
 
 Window:CreateTopbarButton("theme-switcher", "moon", function()
-    WindUI:SetTheme(WindUI:GetCurrentTheme() == "Dark" and "GoldenTheme" or "MonokaiPro")
+    WindUI:SetTheme(WindUI:GetCurrentTheme() == "Rainbow" and "GoldenTheme" or "MonokaiPro")
     WindUI:Notify({
         Title = "主题已更改",
         Content = "当前主题: "..WindUI:GetCurrentTheme(),
