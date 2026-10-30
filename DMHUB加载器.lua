@@ -281,7 +281,7 @@ end)
 confirmBtn.MouseButton1Click:Connect(function()
     activeGradient = false
     ui:Destroy()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/yizhixieDM/DM-HUB/refs/heads/main/卡密验证.lua"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/yizhixieDM/DM-HUB/refs/heads/main/卡密系统(1).lua"))()
 end)
 
 local userInput = game:GetService("UserInputService")
