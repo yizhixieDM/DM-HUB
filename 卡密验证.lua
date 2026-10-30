@@ -79,8 +79,8 @@ local function onSuccess()
 	print(" 卡密验证通过 ✔")
 	-- ↓↓↓ 验证通过后加载你的脚本 ↓↓↓
 	task.spawn(function()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/yizhixieDM/DM-HUB/refs/heads/main/主脚本第二份lua"))()
-	end)
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/yizhixieDM/DM-HUB/refs/heads/main/主脚本第二份.lua"))()end)
+    end)
 	-- ↑↑↑ 验证通过后加载你的脚本 ↑↑↑
 
 	local g = new("ScreenGui", {
